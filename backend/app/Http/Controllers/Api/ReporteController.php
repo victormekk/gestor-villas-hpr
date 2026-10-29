@@ -338,9 +338,9 @@ class ReporteController extends Controller
             'encargados' => [
                 [
                     ['clave' => 'villa', 'titulo' => 'Villa', 'ancho' => 9],
+                    ['clave' => 'propietario', 'titulo' => 'Propietario', 'ancho' => 32],
                     ['clave' => 'encargado', 'titulo' => 'Encargado', 'ancho' => 32],
                     ['clave' => 'parentesco', 'titulo' => 'Parentesco', 'ancho' => 16],
-                    ['clave' => 'propietario', 'titulo' => 'Propietario', 'ancho' => 32],
                     ['clave' => 'dni', 'titulo' => 'DNI', 'ancho' => 18],
                     ['clave' => 'telefonos', 'titulo' => 'Teléfonos', 'ancho' => 30],
                     ['clave' => 'correo', 'titulo' => 'Correo', 'ancho' => 34],
