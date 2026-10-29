@@ -69,9 +69,8 @@ class ReporteExcelService
             $hoja->getStyle("C{$primera}:C{$fila}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             $hoja->setAutoFilter("A".self::FILA_INICIAL.":C{$fila}");
 
-            $fila++;
+            $fila = $this->separadorDeTotal($hoja, $fila);
             $hoja->setCellValue("A{$fila}", mb_strtoupper($etiquetaTotal));
-            $hoja->mergeCells("A{$fila}:B{$fila}");
             $hoja->setCellValue("C{$fila}", $saldos->sum('saldo'));
             $this->filaDeTotal($hoja, "A{$fila}:C{$fila}", 12);
             $hoja->getStyle("C{$fila}")->getNumberFormat()->setFormatCode(self::MONEDA);
@@ -118,10 +117,8 @@ class ReporteExcelService
             $hoja->getStyle("E{$primera}:E{$fila}")->getAlignment()->setWrapText(true);
             $hoja->setAutoFilter('A'.self::FILA_INICIAL.":{$ultima}{$fila}");
 
-            $fila++;
-            $penultima = chr(ord($ultima) - 1);
+            $fila = $this->separadorDeTotal($hoja, $fila);
             $hoja->setCellValue("A{$fila}", 'TOTAL ('.$filas->count().' '.($filas->count() === 1 ? 'movimiento' : 'movimientos').')');
-            $hoja->mergeCells("A{$fila}:{$penultima}{$fila}");
             $hoja->setCellValue("{$ultima}{$fila}", $filas->sum('importe'));
             $this->filaDeTotal($hoja, "A{$fila}:{$ultima}{$fila}", 12);
             $hoja->getStyle("{$ultima}{$fila}")->getNumberFormat()->setFormatCode(self::MONEDA);
@@ -163,9 +160,8 @@ class ReporteExcelService
             $hoja->getStyle("G".(self::FILA_INICIAL + 1).":G{$ultimaDatos}")->getFont()->setBold(true);
             $hoja->setAutoFilter('A'.self::FILA_INICIAL.":G{$ultimaDatos}");
 
-            $fila++;
+            $fila = $this->separadorDeTotal($hoja, $fila);
             $hoja->setCellValue("A{$fila}", 'SALDOS');
-            $hoja->mergeCells("A{$fila}:B{$fila}");
             foreach ($buckets as $j => $bucket) {
                 $hoja->setCellValue([3 + $j, $fila], $antiguedad['totales'][$bucket]);
             }
@@ -175,7 +171,6 @@ class ReporteExcelService
 
             $fila++;
             $hoja->setCellValue("A{$fila}", 'Porcentajes');
-            $hoja->mergeCells("A{$fila}:B{$fila}");
             foreach ($buckets as $j => $bucket) {
                 $hoja->setCellValue([3 + $j, $fila], $antiguedad['porcentajes'][$bucket] / 100);
             }
@@ -294,9 +289,8 @@ class ReporteExcelService
         } else {
             $hoja->setAutoFilter('A'.self::FILA_INICIAL.":D{$fila}");
 
-            $fila++;
+            $fila = $this->separadorDeTotal($hoja, $fila);
             $hoja->setCellValue("A{$fila}", 'Total de registros: '.$registros->count());
-            $hoja->mergeCells("A{$fila}:D{$fila}");
             $this->filaDeTotal($hoja, "A{$fila}:D{$fila}");
         }
 
@@ -391,6 +385,18 @@ class ReporteExcelService
         if ($alterna) {
             $hoja->getStyle($rango)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB(self::CREMA);
         }
+    }
+
+    /**
+     * Deja una fila vacia y delgada entre los datos y el total, y devuelve la fila del total.
+     * Asi, al ordenar, Excel toma solo la tabla y no mete el total entre los datos. Las filas
+     * de total tampoco llevan celdas combinadas: Excel no deja ordenar si las hay.
+     */
+    private function separadorDeTotal(Worksheet $hoja, int $ultimaDatos): int
+    {
+        $hoja->getRowDimension($ultimaDatos + 1)->setRowHeight(6);
+
+        return $ultimaDatos + 2;
     }
 
     /** Fila de totales en negrita; con `$tamano` grande (>= 12) la fila se hace mas alta. */
