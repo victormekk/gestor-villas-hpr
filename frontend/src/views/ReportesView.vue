@@ -18,7 +18,7 @@ const auth = useAuthStore()
 const dataStore = useDataStore()
 const toast = useToastStore()
 
-const tab = ref<'estado' | 'general' | 'antiguedad' | 'concepto'>('estado')
+const tab = ref<'estado' | 'general' | 'antiguedad' | 'concepto' | ListadoPersonas>('estado')
 // sin el permiso de reportes generales solo ve el estado de cuenta por villa (los demas le dan 403)
 const soloEstadoCuenta = !auth.puede('reportes.generales')
 
@@ -224,6 +224,56 @@ function exportarPorConcepto(formato: FormatoExportacion) {
   abrirReporte('por-concepto', formato, paramsConcepto())
 }
 
+// --- Propietarios, encargados e historial de villas: las columnas las manda el backend ---
+type ListadoPersonas = 'propietarios' | 'encargados' | 'historial-villas'
+const LISTADOS: Array<{ id: ListadoPersonas; titulo: string }> = [
+  { id: 'propietarios', titulo: 'Propietarios' },
+  { id: 'encargados', titulo: 'Encargados' },
+  { id: 'historial-villas', titulo: 'Historial de Villas' },
+]
+const listadoActual = computed(() => LISTADOS.find((l) => l.id === tab.value) ?? null)
+const villaListado = ref('') // '' = todas
+const tipoHistorial = ref<'' | 'propietario' | 'encargado'>('') // '' = ambos
+const cargandoListado = ref(false)
+const columnasListado = ref<Array<{ clave: string; titulo: string; fecha?: boolean }>>([])
+const filasListado = ref<Array<Record<string, string | null>>>([])
+/** Textos del backend: el conteo ("Total: 12 villas") y el mensaje cuando no hay filas. */
+const totalListado = ref('')
+const vacioListado = ref('')
+/** Listado de la ultima consulta: al cambiar de pestaña se vuelve a generar. */
+const listadoGenerado = ref<ListadoPersonas | null>(null)
+
+function paramsListado() {
+  return { villa: villaListado.value, tipo: tab.value === 'historial-villas' ? tipoHistorial.value : '' }
+}
+
+async function generarListado() {
+  const listado = listadoActual.value
+  if (!listado) return
+  cargandoListado.value = true
+  try {
+    const p = paramsListado()
+    const { data } = await api.get(`/api/reportes/${listado.id}`, { params: { villa: p.villa || undefined, tipo: p.tipo || undefined } })
+    columnasListado.value = data.columnas
+    filasListado.value = data.data
+    totalListado.value = data.total
+    vacioListado.value = data.vacio
+    listadoGenerado.value = listado.id
+  } catch (e: any) {
+    toast.error(e?.response?.data?.message ?? `No se pudo generar el reporte de ${listado.titulo.toLowerCase()}.`)
+  } finally {
+    cargandoListado.value = false
+  }
+}
+
+function exportarListado(formato: FormatoExportacion) {
+  if (listadoActual.value) abrirReporte(listadoActual.value.id, formato, paramsListado())
+}
+
+watch(tab, () => {
+  if (listadoActual.value && listadoGenerado.value !== listadoActual.value.id) generarListado()
+})
+
 async function cargarTodo() {
   await generarEstadoCuenta()
   if (soloEstadoCuenta) return
@@ -241,6 +291,8 @@ onMounted(() => {
 watch(() => dataStore.version, () => {
   cargarTodo()
   if (conceptoGenerado.value) generarPorConcepto()
+  if (listadoActual.value) generarListado()
+  else listadoGenerado.value = null
 })
 </script>
 
@@ -278,8 +330,68 @@ watch(() => dataStore.version, () => {
         >
           Por Concepto
         </button>
+        <button
+          v-for="l in LISTADOS"
+          :key="l.id"
+          class="border-b-2 px-1 pb-2 font-medium"
+          :class="tab === l.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
+          @click="tab = l.id"
+        >
+          {{ l.titulo }}
+        </button>
       </template>
     </div>
+
+    <!-- Propietarios / Encargados / Historial de villas -->
+    <section v-if="listadoActual">
+      <form class="mb-6 flex flex-wrap items-end gap-3" @submit.prevent="generarListado">
+        <div class="w-full max-w-sm">
+          <label class="mb-1 block text-sm font-medium text-espresso-700">Villa</label>
+          <VillaBuscador v-model="villaListado" con-opcion-todas enviar-con-enter />
+        </div>
+        <div v-if="listadoActual.id === 'historial-villas'">
+          <label class="mb-1 block text-sm font-medium text-espresso-700">Mostrar</label>
+          <select v-model="tipoHistorial" class="rounded-lg border border-espresso-800/15 bg-cream-50 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
+            <option value="">Propietarios y encargados</option>
+            <option value="propietario">Solo propietarios anteriores</option>
+            <option value="encargado">Solo encargados anteriores</option>
+          </select>
+        </div>
+        <button type="submit" class="rounded-lg bg-gradient-to-r from-wine-500 via-brand-500 to-gold-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+          Generar
+        </button>
+        <ExportarBotones @exportar="exportarListado" />
+      </form>
+
+      <p v-if="cargandoListado" class="text-espresso-800/40">Cargando...</p>
+
+      <div v-if="listadoGenerado === listadoActual.id" class="overflow-x-auto rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
+        <table class="min-w-full divide-y divide-gold-300/20 text-sm">
+          <thead class="bg-brand-50/60">
+            <tr>
+              <th v-for="c in columnasListado" :key="c.clave" class="whitespace-nowrap px-4 py-2 text-left font-medium text-espresso-800/70">{{ c.titulo }}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gold-300/15">
+            <tr v-for="(f, i) in filasListado" :key="i">
+              <td v-for="c in columnasListado" :key="c.clave" class="px-4 py-2" :class="{ 'whitespace-nowrap': c.fecha || c.clave === 'villa', 'font-medium': c.clave === 'villa' }">
+                {{ (c.fecha ? formatearFecha(f[c.clave]) : f[c.clave]) || '—' }}
+              </td>
+            </tr>
+            <tr v-if="filasListado.length === 0">
+              <td :colspan="columnasListado.length" class="px-4 py-8 text-center text-espresso-800/40">{{ vacioListado }}</td>
+            </tr>
+          </tbody>
+          <tfoot v-if="filasListado.length > 0">
+            <tr class="border-t border-gold-300/40 text-espresso-800">
+              <td :colspan="columnasListado.length" class="px-4 py-3 font-display font-semibold">
+                {{ totalListado }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
 
     <!-- Por concepto -->
     <section v-if="tab === 'concepto'">

@@ -6,6 +6,7 @@ use App\Support\Formato;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -292,6 +293,60 @@ class ReporteExcelService
             $fila = $this->separadorDeTotal($hoja, $fila);
             $hoja->setCellValue("A{$fila}", 'Total de registros: '.$registros->count());
             $this->filaDeTotal($hoja, "A{$fila}:D{$fila}");
+        }
+
+        $this->configurarImpresion($hoja, $fila, true);
+        $hoja->freezePane('A'.(self::FILA_INICIAL + 1));
+
+        return $libro;
+    }
+
+    /**
+     * Listados de personas (propietarios, encargados, historial de villas). Los textos se guardan
+     * como texto (un DNI o telefono no pierde sus ceros a la izquierda) y las fechas como fecha.
+     *
+     * @param  list<array{clave: string, titulo: string, ancho: int, fecha?: bool}>  $columnas
+     */
+    public function listado(string $titulo, string $subtitulo, array $columnas, Collection $filas, string $etiquetaTotal, string $vacio, string $usuario): Spreadsheet
+    {
+        $ultima = Coordinate::stringFromColumnIndex(count($columnas));
+        [$libro, $hoja] = $this->plantilla($titulo, $subtitulo, $ultima, PageSetup::ORIENTATION_LANDSCAPE, $usuario);
+
+        $letras = [];
+        foreach ($columnas as $i => $c) {
+            $letras[$i] = Coordinate::stringFromColumnIndex($i + 1);
+            $hoja->getColumnDimension($letras[$i])->setWidth($c['ancho']);
+        }
+
+        $fila = self::FILA_INICIAL;
+        $this->encabezadoTabla($hoja, $fila, array_column($columnas, 'titulo'), []);
+
+        foreach ($filas->values() as $n => $f) {
+            $fila++;
+            foreach ($columnas as $i => $c) {
+                $celda = "{$letras[$i]}{$fila}";
+                $valor = $f[$c['clave']];
+                if (! empty($c['fecha'])) {
+                    if ($valor) {
+                        $hoja->setCellValue($celda, Date::PHPToExcel(Carbon::parse($valor)));
+                        $hoja->getStyle($celda)->getNumberFormat()->setFormatCode(self::FECHA);
+                        $hoja->getStyle($celda)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                    }
+                } elseif ($valor !== null && $valor !== '') {
+                    $hoja->setCellValueExplicit($celda, (string) $valor, DataType::TYPE_STRING);
+                }
+            }
+            $this->filaDeDatos($hoja, "A{$fila}:{$ultima}{$fila}", $n % 2 === 1);
+        }
+
+        if ($filas->isEmpty()) {
+            $this->filaVacia($hoja, ++$fila, $ultima, $vacio);
+        } else {
+            $hoja->setAutoFilter('A'.self::FILA_INICIAL.":{$ultima}{$fila}");
+
+            $fila = $this->separadorDeTotal($hoja, $fila);
+            $hoja->setCellValue("A{$fila}", $etiquetaTotal);
+            $this->filaDeTotal($hoja, "A{$fila}:{$ultima}{$fila}");
         }
 
         $this->configurarImpresion($hoja, $fila, true);

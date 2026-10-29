@@ -62,6 +62,15 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::get('/reportes/por-concepto', [ReporteController::class, 'porConcepto']);
         Route::get('/reportes/por-concepto/exportar', [ReporteController::class, 'exportarPorConceptoXlsx']);
         Route::get('/reportes/por-concepto/pdf', [ReporteController::class, 'porConceptoPdf']);
+        Route::get('/reportes/propietarios', [ReporteController::class, 'propietarios']);
+        Route::get('/reportes/propietarios/exportar', [ReporteController::class, 'exportarPropietariosXlsx']);
+        Route::get('/reportes/propietarios/pdf', [ReporteController::class, 'propietariosPdf']);
+        Route::get('/reportes/encargados', [ReporteController::class, 'encargados']);
+        Route::get('/reportes/encargados/exportar', [ReporteController::class, 'exportarEncargadosXlsx']);
+        Route::get('/reportes/encargados/pdf', [ReporteController::class, 'encargadosPdf']);
+        Route::get('/reportes/historial-villas', [ReporteController::class, 'historialVillas']);
+        Route::get('/reportes/historial-villas/exportar', [ReporteController::class, 'exportarHistorialVillasXlsx']);
+        Route::get('/reportes/historial-villas/pdf', [ReporteController::class, 'historialVillasPdf']);
     });
 
     Route::patch('/villas/{villa}/alquilada', [VillaController::class, 'actualizarAlquilada'])->middleware('permiso:config.alquiladas');

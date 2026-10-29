@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Concepto;
 use App\Models\Movimiento;
 use App\Models\Villa;
+use App\Models\VillaHistorial;
 use App\Services\ReporteExcelService;
 use App\Services\SaldoService;
 use Carbon\Carbon;
@@ -213,6 +214,198 @@ class ReporteController extends Controller
             .' · '.($villa ? "Villa {$villa}" : 'Todas las villas');
 
         return compact('concepto', 'filas', 'desde', 'hasta', 'villa', 'subtitulo');
+    }
+
+    // --- Propietarios, encargados e historial de villas: listados de personas, uno por villa ---
+
+    /** reporte => [titulo, nombre de archivo, etiqueta del conteo (singular, plural)] */
+    private const LISTADOS = [
+        'propietarios' => ['Propietarios', 'propietarios', ['villa', 'villas']],
+        'encargados' => ['Encargados', 'encargados', ['villa con encargado', 'villas con encargado']],
+        'historial' => ['Historial de villas', 'historial-de-villas', ['registro', 'registros']],
+    ];
+
+    public function propietarios(Request $request)
+    {
+        return $this->listadoJson($this->datosListado('propietarios', $request));
+    }
+
+    public function propietariosPdf(Request $request): Response
+    {
+        return $this->listadoPdf($this->datosListado('propietarios', $request));
+    }
+
+    public function exportarPropietariosXlsx(Request $request): StreamedResponse
+    {
+        return $this->listadoXlsx($this->datosListado('propietarios', $request));
+    }
+
+    public function encargados(Request $request)
+    {
+        return $this->listadoJson($this->datosListado('encargados', $request));
+    }
+
+    public function encargadosPdf(Request $request): Response
+    {
+        return $this->listadoPdf($this->datosListado('encargados', $request));
+    }
+
+    public function exportarEncargadosXlsx(Request $request): StreamedResponse
+    {
+        return $this->listadoXlsx($this->datosListado('encargados', $request));
+    }
+
+    public function historialVillas(Request $request)
+    {
+        return $this->listadoJson($this->datosListado('historial', $request));
+    }
+
+    public function historialVillasPdf(Request $request): Response
+    {
+        return $this->listadoPdf($this->datosListado('historial', $request));
+    }
+
+    public function exportarHistorialVillasXlsx(Request $request): StreamedResponse
+    {
+        return $this->listadoXlsx($this->datosListado('historial', $request));
+    }
+
+    private function listadoJson(array $d)
+    {
+        return response()->json(['columnas' => $d['columnas'], 'data' => $d['filas'], 'total' => $d['etiquetaTotal'], 'vacio' => $d['vacio']]);
+    }
+
+    private function listadoPdf(array $d): Response
+    {
+        return $this->pdf('reportes.listado', [
+            'titulo' => $d['titulo'],
+            'subtitulo' => $d['subtitulo'],
+            'columnas' => $d['columnas'],
+            'filas' => $d['filas'],
+            'etiquetaTotal' => $d['etiquetaTotal'],
+            'vacio' => $d['vacio'],
+        ], $this->nombreArchivo($d['archivo'], $d['villa'] ?? 'todas', $this->fechaParaArchivo(now()), 'pdf'), 'landscape');
+    }
+
+    private function listadoXlsx(array $d): StreamedResponse
+    {
+        return $this->descargarXlsx(
+            $this->excel->listado($d['titulo'], $d['subtitulo'], $d['columnas'], $d['filas'], $d['etiquetaTotal'], $d['vacio'], $this->usuarioActual()),
+            $this->nombreArchivo($d['archivo'], $d['villa'] ?? 'todas', $this->fechaParaArchivo(now()), 'xlsx'),
+        );
+    }
+
+    /**
+     * Filas y columnas de un listado de personas. `ancho` es el de la columna en Excel; las columnas
+     * con `fecha` traen AAAA-MM-DD (o null) y se muestran como DD/MM/AAAA.
+     *
+     * @return array{titulo: string, subtitulo: string, archivo: string, villa: ?string, columnas: list<array{clave: string, titulo: string, ancho: int, fecha?: bool}>, filas: Collection, etiquetaTotal: string, vacio: string}
+     */
+    private function datosListado(string $reporte, Request $request): array
+    {
+        $data = $request->validate([
+            'villa' => ['nullable', 'string', 'exists:villas,CLV_CLIE'],
+            'tipo' => ['nullable', 'in:'.VillaHistorial::PROPIETARIO.','.VillaHistorial::ENCARGADO],
+        ], [
+            'villa.exists' => 'La villa seleccionada no existe.',
+            'tipo.in' => 'El tipo de historial no es válido.',
+        ]);
+        $villa = $data['villa'] ?? null;
+        $tipo = $data['tipo'] ?? null;
+
+        $villas = fn (array $relaciones) => Villa::enOrdenNatural(
+            Villa::with($relaciones)->when($villa, fn ($q) => $q->where('CLV_CLIE', $villa))->get()
+        );
+
+        [$columnas, $filas, $vacio] = match ($reporte) {
+            'propietarios' => [
+                [
+                    ['clave' => 'villa', 'titulo' => 'Villa', 'ancho' => 9],
+                    ['clave' => 'propietario', 'titulo' => 'Propietario', 'ancho' => 40],
+                    ['clave' => 'dni', 'titulo' => 'DNI', 'ancho' => 18],
+                    ['clave' => 'telefonos', 'titulo' => 'Teléfonos', 'ancho' => 34],
+                    ['clave' => 'correo', 'titulo' => 'Correo', 'ancho' => 40],
+                ],
+                $villas(['propietario'])->map(fn (Villa $v) => [
+                    'villa' => $v->CLV_CLIE,
+                    'propietario' => $v->nombre_completo,
+                    'dni' => $v->propietario?->DNI,
+                    'telefonos' => $this->unir([$v->propietario?->TELF, $v->propietario?->CELULAR, $v->propietario?->OTRO_TEL]),
+                    'correo' => $this->unir([$v->propietario?->MAIL, $v->propietario?->MAIL2]),
+                ]),
+                'Sin resultados',
+            ],
+            'encargados' => [
+                [
+                    ['clave' => 'villa', 'titulo' => 'Villa', 'ancho' => 9],
+                    ['clave' => 'encargado', 'titulo' => 'Encargado', 'ancho' => 32],
+                    ['clave' => 'parentesco', 'titulo' => 'Parentesco', 'ancho' => 16],
+                    ['clave' => 'propietario', 'titulo' => 'Propietario', 'ancho' => 32],
+                    ['clave' => 'dni', 'titulo' => 'DNI', 'ancho' => 18],
+                    ['clave' => 'telefonos', 'titulo' => 'Teléfonos', 'ancho' => 30],
+                    ['clave' => 'correo', 'titulo' => 'Correo', 'ancho' => 34],
+                ],
+                $villas(['propietario', 'encargado'])->filter(fn (Villa $v) => $v->encargado)->values()->map(fn (Villa $v) => [
+                    'villa' => $v->CLV_CLIE,
+                    'encargado' => trim("{$v->encargado->NOMBRES} {$v->encargado->APELLIDOS}"),
+                    'parentesco' => $v->encargado->PARENTESCO,
+                    'propietario' => $v->nombre_completo,
+                    'dni' => $v->encargado->DNI,
+                    'telefonos' => $this->unir([$v->encargado->TELF, $v->encargado->CELULAR, $v->encargado->OTRO_TEL]),
+                    'correo' => $this->unir([$v->encargado->MAIL, $v->encargado->MAIL2]),
+                ]),
+                $villa ? 'Esta villa no tiene encargado' : 'Ninguna villa tiene encargado',
+            ],
+            'historial' => [
+                [
+                    ['clave' => 'villa', 'titulo' => 'Villa', 'ancho' => 9],
+                    ['clave' => 'tipo', 'titulo' => 'Tipo', 'ancho' => 13],
+                    ['clave' => 'nombre', 'titulo' => 'Nombre', 'ancho' => 32],
+                    ['clave' => 'dni', 'titulo' => 'DNI', 'ancho' => 18],
+                    ['clave' => 'telefonos', 'titulo' => 'Teléfonos', 'ancho' => 30],
+                    ['clave' => 'desde', 'titulo' => 'Desde', 'ancho' => 12, 'fecha' => true],
+                    ['clave' => 'hasta', 'titulo' => 'Hasta', 'ancho' => 12, 'fecha' => true],
+                    ['clave' => 'registrado_por', 'titulo' => 'Cambio registrado por', 'ancho' => 22],
+                ],
+                // por villa (en orden natural) y, dentro de cada una, del cambio mas reciente al mas antiguo
+                VillaHistorial::with('usuario')
+                    ->when($villa, fn ($q) => $q->where('CLV_CLIE', $villa))
+                    ->when($tipo, fn ($q) => $q->where('TIPO', $tipo))
+                    ->get()
+                    ->sort(fn (VillaHistorial $a, VillaHistorial $b) => strnatcasecmp($a->CLV_CLIE, $b->CLV_CLIE)
+                        ?: $b->HASTA <=> $a->HASTA
+                        ?: $b->id <=> $a->id)
+                    ->values()
+                    ->map(fn (VillaHistorial $h) => [
+                        'villa' => $h->CLV_CLIE,
+                        'tipo' => $h->TIPO === VillaHistorial::PROPIETARIO ? 'Propietario' : 'Encargado',
+                        'nombre' => $h->nombre_completo,
+                        'dni' => $h->DNI,
+                        'telefonos' => $this->unir([$h->TELF, $h->CELULAR, $h->OTRO_TEL]),
+                        'desde' => $h->DESDE?->toDateString(),
+                        'hasta' => $h->HASTA->toDateString(),
+                        'registrado_por' => $h->usuario?->name,
+                    ]),
+                'Sin propietarios ni encargados anteriores registrados',
+            ],
+        };
+
+        [$titulo, $archivo, [$singular, $plural]] = self::LISTADOS[$reporte];
+        $subtitulo = ($villa ? "Villa {$villa}" : 'Todas las villas')
+            .match ($tipo) {
+                VillaHistorial::PROPIETARIO => ' · Propietarios anteriores',
+                VillaHistorial::ENCARGADO => ' · Encargados anteriores',
+                default => '',
+            };
+        $etiquetaTotal = 'Total: '.$filas->count().' '.($filas->count() === 1 ? $singular : $plural);
+
+        return compact('titulo', 'subtitulo', 'archivo', 'villa', 'columnas', 'filas', 'etiquetaTotal', 'vacio');
+    }
+
+    /** Une los datos que si estan llenos: ["9999-0000", null, "2222-1111"] -> "9999-0000 / 2222-1111". */
+    private function unir(array $valores): string
+    {
+        return implode(' / ', array_filter(array_map(fn ($v) => trim((string) $v), $valores), fn ($v) => $v !== ''));
     }
 
     // --- datos compartidos por las vistas JSON, los PDF y los Excel ---

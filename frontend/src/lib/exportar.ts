@@ -12,7 +12,15 @@ export function abrirRecibo(idMovimiento: number) {
  * navegador y el Excel se descarga. Los parametros vacios no se envian.
  */
 export function abrirReporte(
-  reporte: 'estado-cuenta' | 'saldos-generales' | 'antiguedad-saldos' | 'por-concepto' | 'bitacora',
+  reporte:
+    | 'estado-cuenta'
+    | 'saldos-generales'
+    | 'antiguedad-saldos'
+    | 'por-concepto'
+    | 'propietarios'
+    | 'encargados'
+    | 'historial-villas'
+    | 'bitacora',
   formato: FormatoExportacion,
   params: Record<string, string | boolean | undefined>,
 ) {

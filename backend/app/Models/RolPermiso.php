@@ -27,7 +27,7 @@ class RolPermiso extends Model
         'movimientos.anular' => ['Cargos y créditos', 'Anular movimientos', 'Anular un cargo o abono ya capturado (Reimpresión).'],
         'inicio.cobranza' => ['Inicio', 'Ver cobranza del mes', 'Cuentas por cobrar y lo recuperado en el mes.'],
         'inicio.completo' => ['Inicio', 'Ver saldo a favor y resumen del año', 'Indicadores completos de la pantalla de inicio.'],
-        'reportes.generales' => ['Reportes', 'Reportes generales', 'Saldos generales, antigüedad de saldos y reporte por concepto.'],
+        'reportes.generales' => ['Reportes', 'Reportes generales', 'Saldos generales, antigüedad de saldos, reporte por concepto, propietarios, encargados e historial de villas.'],
         'config.conceptos' => ['Configuración', 'Conceptos', 'Crear, editar, activar y eliminar conceptos.'],
         'config.cuotas' => ['Configuración', 'Cuotas', 'Cuota de mantenimiento y cuotas especiales.'],
         'config.alquiladas' => ['Configuración', 'Villas alquiladas', 'Marcar las villas alquiladas a producción.'],
