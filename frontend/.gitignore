@@ -23,3 +23,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Paquete original de iconos PWA (lo que se usa ya esta en public/icons/)
+/src/assets/LEEME.txt
+/src/assets/manifest-icons.json
+/src/assets/villas-iconos-pwa.zip
+/src/assets/favicon-32.png
