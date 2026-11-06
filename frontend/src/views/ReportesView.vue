@@ -164,17 +164,18 @@ function exportarAntiguedad(formato: FormatoExportacion) {
 
 // --- Por concepto: movimientos de un concepto (cargo o crédito) en un rango de fechas ---
 const conceptos = ref<Concepto[]>([])
-const conceptoFiltro = ref<number | ''>('')
+// 'cargos' / 'creditos' = todos los conceptos de ese tipo
+const conceptoFiltro = ref<number | 'cargos' | 'creditos' | ''>('')
 const villaConcepto = ref('') // '' = todas
 const desdeConcepto = ref(primerDiaMesActual())
 const hastaConcepto = ref(hoy())
 const cargandoConcepto = ref(false)
 const movimientosConcepto = ref<
-  Array<{ id: number; fecha: string; correlativo: string | null; villa: string; propietario: string | null; descripcion: string | null; forma_pago: string | null; importe: number }>
+  Array<{ id: number; fecha: string; correlativo: string | null; villa: string; propietario: string | null; concepto: string | null; descripcion: string | null; forma_pago: string | null; importe: number }>
 >([])
 const totalConcepto = ref(0)
-/** Concepto del ultimo reporte generado (la tabla muestra la forma de pago solo si es credito). */
-const conceptoGenerado = ref<{ DESCR: string; ES_CARGO: boolean } | null>(null)
+/** Concepto del ultimo reporte generado (la tabla muestra la forma de pago solo si es credito y la columna del concepto con "todos"). */
+const conceptoGenerado = ref<{ DESCR: string; ES_CARGO: boolean; TODOS: boolean } | null>(null)
 
 const conceptosCargo = computed(() => conceptos.value.filter((c) => c.ES_CARGO))
 const conceptosCredito = computed(() => conceptos.value.filter((c) => !c.ES_CARGO))
@@ -300,9 +301,9 @@ watch(() => dataStore.version, () => {
   <div>
     <p class="mb-4 font-display text-2xl font-semibold text-espresso-800">Reportes</p>
 
-    <div class="mb-4 flex gap-4 border-b border-gold-300/30 text-sm">
+    <div class="-mx-4 mb-4 flex gap-4 overflow-x-auto border-b border-gold-300/30 px-4 text-sm sm:mx-0 sm:px-0">
       <button
-        class="border-b-2 px-1 pb-2 font-medium"
+        class="shrink-0 whitespace-nowrap border-b-2 px-1 pb-2 font-medium"
         :class="tab === 'estado' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
         @click="tab = 'estado'"
       >
@@ -310,21 +311,21 @@ watch(() => dataStore.version, () => {
       </button>
       <template v-if="!soloEstadoCuenta">
         <button
-          class="border-b-2 px-1 pb-2 font-medium"
+          class="shrink-0 whitespace-nowrap border-b-2 px-1 pb-2 font-medium"
           :class="tab === 'general' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
           @click="tab = 'general'"
         >
           Saldos Generales
         </button>
         <button
-          class="border-b-2 px-1 pb-2 font-medium"
+          class="shrink-0 whitespace-nowrap border-b-2 px-1 pb-2 font-medium"
           :class="tab === 'antiguedad' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
           @click="tab = 'antiguedad'"
         >
           Antigüedad de Saldos
         </button>
         <button
-          class="border-b-2 px-1 pb-2 font-medium"
+          class="shrink-0 whitespace-nowrap border-b-2 px-1 pb-2 font-medium"
           :class="tab === 'concepto' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
           @click="tab = 'concepto'"
         >
@@ -333,7 +334,7 @@ watch(() => dataStore.version, () => {
         <button
           v-for="l in LISTADOS"
           :key="l.id"
-          class="border-b-2 px-1 pb-2 font-medium"
+          class="shrink-0 whitespace-nowrap border-b-2 px-1 pb-2 font-medium"
           :class="tab === l.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
           @click="tab = l.id"
         >
@@ -402,9 +403,11 @@ watch(() => dataStore.version, () => {
             <select v-model="conceptoFiltro" class="w-full rounded-lg border border-espresso-800/15 bg-cream-50 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
               <option value="" disabled>Selecciona un concepto</option>
               <optgroup label="Cargos">
+                <option value="cargos">Todos los cargos</option>
                 <option v-for="c in conceptosCargo" :key="c.NUM_CPTO" :value="c.NUM_CPTO">{{ c.DESCR }}{{ c.ACTIVO ? '' : ' (inactivo)' }}</option>
               </optgroup>
               <optgroup label="Créditos">
+                <option value="creditos">Todos los créditos</option>
                 <option v-for="c in conceptosCredito" :key="c.NUM_CPTO" :value="c.NUM_CPTO">{{ c.DESCR }}{{ c.ACTIVO ? '' : ' (inactivo)' }}</option>
               </optgroup>
             </select>
@@ -432,7 +435,7 @@ watch(() => dataStore.version, () => {
 
       <p v-if="cargandoConcepto" class="text-espresso-800/40">Cargando...</p>
 
-      <div v-if="conceptoGenerado" class="rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm">
+      <div v-if="conceptoGenerado" class="rounded-xl border border-gold-300/30 bg-cream-50 p-3 shadow-sm sm:p-5">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-gold-300/20 pb-3">
           <h2 class="font-display font-semibold text-espresso-800">
             {{ conceptoGenerado.DESCR }}
@@ -453,6 +456,7 @@ watch(() => dataStore.version, () => {
                 <th class="whitespace-nowrap py-1.5 pr-2">Correlativo No.</th>
                 <th class="py-1.5 pr-2">Villa</th>
                 <th class="py-1.5 pr-2">Propietario</th>
+                <th v-if="conceptoGenerado.TODOS" class="py-1.5 pr-2">Concepto</th>
                 <th class="py-1.5 pr-2">Descripción</th>
                 <th v-if="!conceptoGenerado.ES_CARGO" class="py-1.5 pr-2">Forma de pago</th>
                 <th class="py-1.5 pr-2 text-right">Importe</th>
@@ -465,6 +469,7 @@ watch(() => dataStore.version, () => {
                 <td class="whitespace-nowrap py-1.5 pr-2 font-mono text-xs">{{ m.correlativo ?? '—' }}</td>
                 <td class="py-1.5 pr-2 font-medium">{{ m.villa }}</td>
                 <td class="py-1.5 pr-2">{{ m.propietario }}</td>
+                <td v-if="conceptoGenerado.TODOS" class="py-1.5 pr-2">{{ m.concepto }}</td>
                 <td class="py-1.5 pr-2 text-espresso-800/80">{{ m.descripcion }}</td>
                 <td v-if="!conceptoGenerado.ES_CARGO" class="py-1.5 pr-2">{{ m.forma_pago ?? '—' }}</td>
                 <td class="whitespace-nowrap py-1.5 pr-2 text-right font-medium">{{ formatearMonto(m.importe) }}</td>
@@ -473,7 +478,7 @@ watch(() => dataStore.version, () => {
                 </td>
               </tr>
               <tr v-if="movimientosConcepto.length === 0">
-                <td :colspan="conceptoGenerado.ES_CARGO ? 7 : 8" class="py-8 text-center text-espresso-800/40">Sin movimientos de este concepto en el rango</td>
+                <td :colspan="(conceptoGenerado.ES_CARGO ? 7 : 8) + (conceptoGenerado.TODOS ? 1 : 0)" class="py-8 text-center text-espresso-800/40">Sin movimientos {{ conceptoGenerado.TODOS ? 'de este tipo' : 'de este concepto' }} en el rango</td>
               </tr>
             </tbody>
           </table>
@@ -506,46 +511,48 @@ watch(() => dataStore.version, () => {
 
       <p v-if="cargandoEstado" class="text-espresso-800/40">Cargando...</p>
 
-      <div v-for="r in reportesEstado" :key="r.villa" class="mb-8 rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm">
-        <div class="mb-3 flex items-center justify-between border-b border-gold-300/20 pb-3">
+      <div v-for="r in reportesEstado" :key="r.villa" class="mb-8 rounded-xl border border-gold-300/30 bg-cream-50 p-3 shadow-sm sm:p-5">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-gold-300/20 pb-3">
           <h2 class="font-display font-semibold text-espresso-800">Villa #{{ r.villa }} — {{ r.propietario }}</h2>
           <p class="font-display font-semibold text-espresso-800">Saldo a la fecha: {{ formatearMonto(r.saldo_actual) }}</p>
         </div>
-        <table class="min-w-full divide-y divide-gold-300/20 text-sm">
-          <thead>
-            <tr class="text-left text-espresso-800/50">
-              <th class="py-1.5 pr-2">Fecha</th>
-              <th class="py-1.5 pr-2">Descripción</th>
-              <th class="py-1.5 pr-2 text-right">Cargo</th>
-              <th class="py-1.5 pr-2 text-right">Crédito</th>
-              <th class="py-1.5 text-right">Saldo</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gold-300/15">
-            <tr>
-              <td colspan="4" class="py-1.5 pr-2 text-espresso-800/50">Saldo inicial</td>
-              <td class="py-1.5 text-right font-medium">{{ formatearMonto(r.estado_cuenta.saldo_inicial) }}</td>
-            </tr>
-            <tr
-              v-for="(m, i) in r.estado_cuenta.movimientos"
-              :key="i"
-              tabindex="0"
-              title="Ver detalle y documento"
-              class="cursor-pointer hover:bg-brand-50/50 focus:bg-brand-50/50 focus:outline-none"
-              @click="movimientoDetalle = m"
-              @keydown.enter="movimientoDetalle = m"
-            >
-              <td class="py-1.5 pr-2">{{ formatearFecha(m.fecha) }}</td>
-              <td class="py-1.5 pr-2">
-                {{ m.descripcion }}
-                <span v-if="m.observacion" class="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-gold-500 align-middle" title="Tiene observación"></span>
-              </td>
-              <td class="py-1.5 pr-2 text-right">{{ m.cargo ? formatearMonto(m.cargo) : '' }}</td>
-              <td class="py-1.5 pr-2 text-right">{{ m.credito ? formatearMonto(m.credito) : '' }}</td>
-              <td class="py-1.5 text-right">{{ formatearMonto(m.saldo) }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gold-300/20 text-sm">
+            <thead>
+              <tr class="text-left text-espresso-800/50">
+                <th class="py-1.5 pr-2">Fecha</th>
+                <th class="py-1.5 pr-2">Descripción</th>
+                <th class="py-1.5 pr-2 text-right">Cargo</th>
+                <th class="py-1.5 pr-2 text-right">Crédito</th>
+                <th class="py-1.5 text-right">Saldo</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gold-300/15">
+              <tr>
+                <td colspan="4" class="py-1.5 pr-2 text-espresso-800/50">Saldo inicial</td>
+                <td class="py-1.5 text-right font-medium">{{ formatearMonto(r.estado_cuenta.saldo_inicial) }}</td>
+              </tr>
+              <tr
+                v-for="(m, i) in r.estado_cuenta.movimientos"
+                :key="i"
+                tabindex="0"
+                title="Ver detalle y documento"
+                class="cursor-pointer hover:bg-brand-50/50 focus:bg-brand-50/50 focus:outline-none"
+                @click="movimientoDetalle = m"
+                @keydown.enter="movimientoDetalle = m"
+              >
+                <td class="whitespace-nowrap py-1.5 pr-2">{{ formatearFecha(m.fecha) }}</td>
+                <td class="py-1.5 pr-2">
+                  {{ m.descripcion }}
+                  <span v-if="m.observacion" class="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-gold-500 align-middle" title="Tiene observación"></span>
+                </td>
+                <td class="whitespace-nowrap py-1.5 pr-2 text-right">{{ m.cargo ? formatearMonto(m.cargo) : '' }}</td>
+                <td class="whitespace-nowrap py-1.5 pr-2 text-right">{{ m.credito ? formatearMonto(m.credito) : '' }}</td>
+                <td class="whitespace-nowrap py-1.5 text-right">{{ formatearMonto(m.saldo) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -605,7 +612,7 @@ watch(() => dataStore.version, () => {
 
       <p v-if="cargandoGeneral" class="text-espresso-800/40">Cargando...</p>
 
-      <div class="overflow-hidden rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
+      <div class="overflow-x-auto rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
         <table class="min-w-full divide-y divide-gold-300/20 text-sm">
           <thead class="bg-brand-50/60">
             <tr>

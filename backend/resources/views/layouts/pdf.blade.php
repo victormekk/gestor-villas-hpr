@@ -52,6 +52,10 @@
         .deuda { color: #000000; }
         .favor { color: #000000; }
         .vacio { padding: 26px 0; text-align: center; color: #444444; }
+        /* reportes largos: una tabla por pagina (ver App\Support\PaginasPdf); anchos fijos para que las
+           columnas queden alineadas de una hoja a otra */
+        table.por-pagina { table-layout: fixed; }
+        .pagina-nueva { page-break-before: always; }
 
         @yield('estilos')
     </style>

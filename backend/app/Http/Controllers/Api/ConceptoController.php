@@ -96,12 +96,7 @@ class ConceptoController extends Controller
             ], 422);
         }
 
-        if (! $data['ACTIVO'] && $concepto->movimientos()->exists()) {
-            return response()->json([
-                'message' => 'No se puede desactivar: este concepto ya tiene movimientos aplicados a una o más villas.',
-            ], 422);
-        }
-
+        // un concepto ya utilizado si se puede desactivar: deja de salir al capturar, pero sus movimientos se quedan
         $concepto->update(['ACTIVO' => $data['ACTIVO']]);
 
         Bitacora::registrar('concepto', $data['ACTIVO'] ? 'activar' : 'desactivar', ($data['ACTIVO'] ? 'Activó' : 'Desactivó')." el concepto \"{$concepto->DESCR}\".");
@@ -119,7 +114,7 @@ class ConceptoController extends Controller
 
         if ($concepto->movimientos()->exists()) {
             return response()->json([
-                'message' => 'No se puede eliminar: este concepto ya tiene movimientos aplicados a una o más villas.',
+                'message' => 'No se pueden eliminar conceptos ya utilizados. Puedes desactivarlo para que ya no se use.',
             ], 422);
         }
 

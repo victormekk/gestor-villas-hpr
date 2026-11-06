@@ -132,7 +132,7 @@ class ReporteController extends Controller
         return response()->json([
             'data' => $d['filas'],
             'total' => round($d['filas']->sum('importe'), 2),
-            'concepto' => ['NUM_CPTO' => $d['concepto']->NUM_CPTO, 'DESCR' => $d['concepto']->DESCR, 'ES_CARGO' => (bool) $d['concepto']->ES_CARGO],
+            'concepto' => $d['concepto'],
         ]);
     }
 
@@ -145,7 +145,8 @@ class ReporteController extends Controller
             'subtitulo' => $d['subtitulo'],
             'filas' => $d['filas'],
             'total' => $d['filas']->sum('importe'),
-            'esCargo' => (bool) $d['concepto']->ES_CARGO,
+            'esCargo' => $d['concepto']['ES_CARGO'],
+            'conColumnaConcepto' => $d['concepto']['TODOS'],
         ], $this->nombreArchivo('reporte-por-concepto', $d['villa'] ?? 'todas', $this->rangoParaArchivo($d['desde'], $d['hasta']), 'pdf'), 'landscape');
     }
 
@@ -154,27 +155,36 @@ class ReporteController extends Controller
         $d = $this->datosPorConcepto($request);
 
         return $this->descargarXlsx(
-            $this->excel->porConcepto($d['subtitulo'], $d['filas'], (bool) $d['concepto']->ES_CARGO, $this->usuarioActual()),
+            $this->excel->porConcepto($d['subtitulo'], $d['filas'], $d['concepto']['ES_CARGO'], $d['concepto']['TODOS'], $this->usuarioActual()),
             $this->nombreArchivo('reporte-por-concepto', $d['villa'] ?? 'todas', $this->rangoParaArchivo($d['desde'], $d['hasta']), 'xlsx'),
         );
     }
 
+    /** Valores especiales del filtro "concepto": todos los cargos o todos los creditos a la vez. */
+    private const TODOS_LOS_CONCEPTOS = ['cargos' => [true, 'Todos los cargos'], 'creditos' => [false, 'Todos los créditos']];
+
     /**
-     * Movimientos vigentes (sin anulados) de un concepto entre dos fechas, opcionalmente de una sola
-     * villa, del mas antiguo al mas reciente.
+     * Movimientos vigentes (sin anulados) de un concepto (o de todos los cargos / todos los creditos)
+     * entre dos fechas, opcionalmente de una sola villa, del mas antiguo al mas reciente.
      *
-     * @return array{concepto: Concepto, filas: Collection, desde: Carbon, hasta: Carbon, villa: ?string, subtitulo: string}
+     * @return array{concepto: array{NUM_CPTO: int|string, DESCR: string, ES_CARGO: bool, TODOS: bool}, filas: Collection, desde: Carbon, hasta: Carbon, villa: ?string, subtitulo: string}
      */
     private function datosPorConcepto(Request $request): array
     {
         $data = $request->validate([
-            'concepto' => ['required', 'integer', 'exists:conceptos,NUM_CPTO'],
+            'concepto' => [
+                'required',
+                function (string $attribute, mixed $value, \Closure $fail) {
+                    if (! isset(self::TODOS_LOS_CONCEPTOS[$value]) && ! (ctype_digit((string) $value) && Concepto::whereKey($value)->exists())) {
+                        $fail('El concepto seleccionado no existe.');
+                    }
+                },
+            ],
             'villa' => ['nullable', 'string', 'exists:villas,CLV_CLIE'],
             'desde' => ['required', 'date'],
             'hasta' => ['required', 'date', 'after_or_equal:desde'],
         ], [
             'concepto.required' => 'Debes seleccionar un concepto.',
-            'concepto.exists' => 'El concepto seleccionado no existe.',
             'villa.exists' => 'La villa seleccionada no existe.',
             'desde.required' => 'Debes indicar la fecha de inicio.',
             'desde.date' => 'La fecha de inicio no es válida.',
@@ -183,13 +193,24 @@ class ReporteController extends Controller
             'hasta.after_or_equal' => 'La fecha de corte no puede ser anterior a la fecha de inicio.',
         ]);
 
-        $concepto = Concepto::findOrFail($data['concepto']);
+        if (isset(self::TODOS_LOS_CONCEPTOS[$data['concepto']])) {
+            [$esCargo, $descr] = self::TODOS_LOS_CONCEPTOS[$data['concepto']];
+            $concepto = ['NUM_CPTO' => $data['concepto'], 'DESCR' => $descr, 'ES_CARGO' => $esCargo, 'TODOS' => true];
+        } else {
+            $c = Concepto::findOrFail($data['concepto']);
+            $concepto = ['NUM_CPTO' => $c->NUM_CPTO, 'DESCR' => $c->DESCR, 'ES_CARGO' => (bool) $c->ES_CARGO, 'TODOS' => false];
+        }
         $desde = Carbon::parse($data['desde']);
         $hasta = Carbon::parse($data['hasta']);
         $villa = $data['villa'] ?? null;
 
-        $filas = Movimiento::with(['villa', 'formaPago'])
-            ->where('NUM_CPTO', $concepto->NUM_CPTO)
+        $filas = Movimiento::with(['villa', 'formaPago', 'concepto'])
+            // "todos": los de cualquier concepto de ese tipo, incluidos los conceptos desactivados
+            ->when(
+                $concepto['TODOS'],
+                fn ($q) => $q->whereHas('concepto', fn ($c) => $c->where('ES_CARGO', $concepto['ES_CARGO'])),
+                fn ($q) => $q->where('NUM_CPTO', $concepto['NUM_CPTO']),
+            )
             // whereDate y no whereBetween con texto: en SQLite la fecha puede venir guardada con hora
             // ("2026-10-05 00:00:00") y se quedaba fuera el ultimo dia del rango
             ->whereDate('FECHA_APLI', '>=', $desde->toDateString())
@@ -204,12 +225,13 @@ class ReporteController extends Controller
                 'correlativo' => $m->CORRELATIVO,
                 'villa' => $m->CLV_CLIE,
                 'propietario' => $m->villa?->nombre_completo,
+                'concepto' => $m->concepto?->DESCR,
                 'descripcion' => $m->OBS,
                 'forma_pago' => $m->formaPago?->nombre,
                 'importe' => (float) $m->IMPORTE,
             ]);
 
-        $subtitulo = 'Concepto: '.$concepto->DESCR.($concepto->ES_CARGO ? ' (cargo)' : ' (crédito)')
+        $subtitulo = ($concepto['TODOS'] ? $concepto['DESCR'] : 'Concepto: '.$concepto['DESCR'].($concepto['ES_CARGO'] ? ' (cargo)' : ' (crédito)'))
             .' · Del '.$desde->format('d/m/Y').' al '.$hasta->format('d/m/Y')
             .' · '.($villa ? "Villa {$villa}" : 'Todas las villas');
 

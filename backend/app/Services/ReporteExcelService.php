@@ -84,38 +84,44 @@ class ReporteExcelService
     }
 
     /** Reporte por concepto: movimientos de un concepto (cargo o credito) en un rango de fechas. */
-    public function porConcepto(string $subtitulo, Collection $filas, bool $esCargo, string $usuario): Spreadsheet
+    public function porConcepto(string $subtitulo, Collection $filas, bool $esCargo, bool $conColumnaConcepto, string $usuario): Spreadsheet
     {
-        // los creditos llevan ademas la forma de pago
-        $titulos = ['Fecha', 'Correlativo No.', 'Villa', 'Propietario', 'Descripción', ...($esCargo ? [] : ['Forma de pago']), 'Importe'];
-        $ultima = $esCargo ? 'F' : 'G';
+        // titulo => [ancho, valor de la fila]; "todos los cargos/creditos" lleva el concepto y los creditos la forma de pago
+        $columnas = [
+            'Fecha' => [13, fn ($f) => Carbon::parse($f['fecha'])->format('d/m/Y')],
+            'Correlativo No.' => [13, fn ($f) => $f['correlativo'] ?? '—'],
+            'Villa' => [9, fn ($f) => $f['villa']],
+            'Propietario' => [34, fn ($f) => $f['propietario']],
+            ...($conColumnaConcepto ? ['Concepto' => [24, fn ($f) => $f['concepto']]] : []),
+            'Descripción' => [50, fn ($f) => $f['descripcion']],
+            ...($esCargo ? [] : ['Forma de pago' => [18, fn ($f) => $f['forma_pago'] ?? '—']]),
+            'Importe' => [16, fn ($f) => $f['importe']],
+        ];
+        $letras = array_map(fn ($i) => Coordinate::stringFromColumnIndex($i + 1), array_keys(array_keys($columnas)));
+        $ultima = end($letras);
+        $colDescr = $letras[array_search('Descripción', array_keys($columnas))];
+
         [$libro, $hoja] = $this->plantilla('Reporte por concepto', $subtitulo, $ultima, PageSetup::ORIENTATION_LANDSCAPE, $usuario);
-        $this->anchos($hoja, ['A' => 13, 'B' => 13, 'C' => 9, 'D' => 34, 'E' => 50] + ($esCargo ? ['F' => 16] : ['F' => 18, 'G' => 16]));
+        $this->anchos($hoja, array_combine($letras, array_column($columnas, 0)));
 
         $fila = self::FILA_INICIAL;
-        $this->encabezadoTabla($hoja, $fila, $titulos, [$ultima]);
+        $this->encabezadoTabla($hoja, $fila, array_keys($columnas), [$ultima]);
         $primera = $fila + 1;
 
         foreach ($filas->values() as $i => $f) {
             $fila++;
-            $hoja->setCellValue("A{$fila}", Carbon::parse($f['fecha'])->format('d/m/Y'));
-            $hoja->setCellValue("B{$fila}", $f['correlativo'] ?? '—');
-            $hoja->setCellValue("C{$fila}", $f['villa']);
-            $hoja->setCellValue("D{$fila}", $f['propietario']);
-            $hoja->setCellValue("E{$fila}", $f['descripcion']);
-            if (! $esCargo) {
-                $hoja->setCellValue("F{$fila}", $f['forma_pago'] ?? '—');
+            foreach (array_values($columnas) as $j => [, $valor]) {
+                $hoja->setCellValue($letras[$j].$fila, $valor($f));
             }
-            $hoja->setCellValue("{$ultima}{$fila}", $f['importe']);
             $this->filaDeDatos($hoja, "A{$fila}:{$ultima}{$fila}", $i % 2 === 1);
         }
 
         if ($filas->isEmpty()) {
-            $this->filaVacia($hoja, ++$fila, $ultima, 'Sin movimientos de este concepto en el rango');
+            $this->filaVacia($hoja, ++$fila, $ultima, $conColumnaConcepto ? 'Sin movimientos de este tipo en el rango' : 'Sin movimientos de este concepto en el rango');
         } else {
             $hoja->getStyle("{$ultima}{$primera}:{$ultima}{$fila}")->getNumberFormat()->setFormatCode(self::MONEDA);
             $hoja->getStyle("{$ultima}{$primera}:{$ultima}{$fila}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-            $hoja->getStyle("E{$primera}:E{$fila}")->getAlignment()->setWrapText(true);
+            $hoja->getStyle("{$colDescr}{$primera}:{$colDescr}{$fila}")->getAlignment()->setWrapText(true);
             $hoja->setAutoFilter('A'.self::FILA_INICIAL.":{$ultima}{$fila}");
 
             $fila = $this->separadorDeTotal($hoja, $fila);

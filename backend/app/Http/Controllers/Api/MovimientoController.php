@@ -141,7 +141,7 @@ class MovimientoController extends Controller
         $concepto = Concepto::findOrFail($data['NUM_CPTO']);
         $villa = Villa::findOrFail($data['CLV_CLIE']);
 
-        $this->exigirCuotaConfigurada($concepto);
+        $this->exigirConceptoAplicable($concepto);
 
         $data['IMPORTE'] = $this->montoParaConcepto($concepto, $villa, (float) $data['IMPORTE']);
 
@@ -196,7 +196,7 @@ class MovimientoController extends Controller
 
         $fecha = $this->fechaDeAplicacion();
         $concepto = Concepto::findOrFail($data['NUM_CPTO']);
-        $this->exigirCuotaConfigurada($concepto);
+        $this->exigirConceptoAplicable($concepto);
         $villas = Villa::where('APLICOBRO', true)->get();
         $villasConCuotaEspecial = 0;
 
@@ -324,8 +324,15 @@ class MovimientoController extends Controller
      * La cuota de mantenimiento no se puede aplicar mientras Director/Admin no haya definido
      * su monto: si no, quedaria como concepto de monto libre y cualquiera podria escribirlo.
      */
-    private function exigirCuotaConfigurada(Concepto $concepto): void
+    private function exigirConceptoAplicable(Concepto $concepto): void
     {
+        // un concepto desactivado (Configuracion -> Conceptos) ya no se puede aplicar; sus movimientos viejos se quedan
+        if (! $concepto->ACTIVO) {
+            throw ValidationException::withMessages([
+                'NUM_CPTO' => "El concepto \"{$concepto->DESCR}\" está desactivado y ya no se puede aplicar.",
+            ]);
+        }
+
         if ($concepto->ES_MANTENIMIENTO && $concepto->MONTO_DEFAULT === null) {
             throw ValidationException::withMessages([
                 'NUM_CPTO' => 'La cuota de mantenimiento aún no está configurada. Un Director o Administrador debe definirla en Configuración → Cuotas.',
