@@ -883,7 +883,7 @@ onMounted(() => {
         </div>
       </form>
 
-      <div class="overflow-hidden rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
+      <div class="overflow-x-auto rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
         <table class="min-w-full divide-y divide-gold-300/20 text-sm">
           <thead class="bg-brand-50/60">
             <tr>
@@ -1093,7 +1093,7 @@ onMounted(() => {
         </div>
       </form>
 
-      <div class="overflow-hidden rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
+      <div class="overflow-x-auto rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
         <table class="min-w-full divide-y divide-gold-300/20 text-sm">
           <thead class="bg-brand-50/60">
             <tr>
@@ -1255,7 +1255,7 @@ onMounted(() => {
         cuota de mantenimiento, en lugar de la cuota mensual.
       </p>
 
-      <div class="overflow-hidden rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
+      <div class="overflow-x-auto rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
         <table class="min-w-full divide-y divide-gold-300/20 text-sm">
           <thead class="bg-brand-50/60">
             <tr>
@@ -1359,7 +1359,7 @@ onMounted(() => {
         </button>
       </div>
 
-      <div class="overflow-hidden rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
+      <div class="overflow-x-auto rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
         <table class="min-w-full divide-y divide-gold-300/20 text-sm">
           <thead class="bg-brand-50/60">
             <tr>
@@ -1421,7 +1421,7 @@ onMounted(() => {
         </button>
       </form>
 
-      <div class="overflow-hidden rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
+      <div class="overflow-x-auto rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
         <table class="min-w-full divide-y divide-gold-300/20 text-sm">
           <thead class="bg-brand-50/60">
             <tr>
@@ -1520,7 +1520,7 @@ onMounted(() => {
 
       <p v-if="cargandoBitacora" class="text-espresso-800/40">Cargando...</p>
 
-      <div class="overflow-hidden rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
+      <div class="overflow-x-auto rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
         <table class="min-w-full divide-y divide-gold-300/20 text-sm">
           <thead class="bg-brand-50/60">
             <tr>

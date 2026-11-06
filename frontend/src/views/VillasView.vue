@@ -68,7 +68,7 @@ onMounted(buscar)
       </button>
     </form>
 
-    <div class="overflow-hidden rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
+    <div class="overflow-x-auto rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
       <table class="min-w-full divide-y divide-gold-300/20 text-sm">
         <thead class="bg-brand-50/60">
           <tr>
