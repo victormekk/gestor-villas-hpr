@@ -469,7 +469,7 @@ watch(() => dataStore.version, () => {
               <tr v-for="m in movimientosConcepto" :key="m.id" class="hover:bg-brand-50/40">
                 <td class="whitespace-nowrap py-1.5 pr-2">{{ formatearFecha(m.fecha) }}</td>
                 <td class="whitespace-nowrap py-1.5 pr-2 font-mono text-xs">{{ m.correlativo ?? '—' }}</td>
-                <td class="py-1.5 pr-2 font-medium">{{ m.villa }}</td>
+                <td class="whitespace-nowrap py-1.5 pr-2 font-medium">{{ m.villa }}</td>
                 <td class="py-1.5 pr-2">{{ m.propietario }}</td>
                 <td v-if="conceptoGenerado.TODOS" class="py-1.5 pr-2">{{ m.concepto }}</td>
                 <td class="py-1.5 pr-2 text-espresso-800/80">{{ m.descripcion }}</td>
@@ -633,7 +633,7 @@ watch(() => dataStore.version, () => {
           </thead>
           <tbody class="divide-y divide-gold-300/15">
             <tr v-for="s in saldos" :key="s.villa">
-              <td class="px-4 py-2">{{ s.villa }}</td>
+              <td class="whitespace-nowrap px-4 py-2">{{ s.villa }}</td>
               <td class="px-4 py-2 text-right font-medium" :class="s.saldo > 0 ? 'text-wine-600' : s.saldo < 0 ? 'text-emerald-600' : 'text-espresso-800/40'">
                 {{ formatearMonto(s.saldo) }}
               </td>
@@ -686,13 +686,13 @@ watch(() => dataStore.version, () => {
           </thead>
           <tbody class="divide-y divide-gold-300/15">
             <tr v-for="f in antiguedad.filas" :key="f.villa">
-              <td class="px-4 py-2">{{ f.villa }}</td>
+              <td class="whitespace-nowrap px-4 py-2 font-medium">{{ f.villa }}</td>
               <td class="px-4 py-2">{{ f.propietario }}</td>
-              <td class="px-4 py-2 text-right">{{ f.bucket === 'd90mas' ? formatearMonto(f.saldo) : '' }}</td>
-              <td class="px-4 py-2 text-right">{{ f.bucket === 'd90' ? formatearMonto(f.saldo) : '' }}</td>
-              <td class="px-4 py-2 text-right">{{ f.bucket === 'd60' ? formatearMonto(f.saldo) : '' }}</td>
-              <td class="px-4 py-2 text-right">{{ f.bucket === 'd30' ? formatearMonto(f.saldo) : '' }}</td>
-              <td class="px-4 py-2 text-right font-medium">{{ formatearMonto(f.saldo) }}</td>
+              <td class="whitespace-nowrap px-4 py-2 text-right">{{ f.bucket === 'd90mas' ? formatearMonto(f.saldo) : '' }}</td>
+              <td class="whitespace-nowrap px-4 py-2 text-right">{{ f.bucket === 'd90' ? formatearMonto(f.saldo) : '' }}</td>
+              <td class="whitespace-nowrap px-4 py-2 text-right">{{ f.bucket === 'd60' ? formatearMonto(f.saldo) : '' }}</td>
+              <td class="whitespace-nowrap px-4 py-2 text-right">{{ f.bucket === 'd30' ? formatearMonto(f.saldo) : '' }}</td>
+              <td class="whitespace-nowrap px-4 py-2 text-right font-medium">{{ formatearMonto(f.saldo) }}</td>
             </tr>
             <tr v-if="!cargandoAntiguedad && antiguedad.filas.length === 0">
               <td colspan="7" class="px-4 py-8 text-center text-espresso-800/40">Ninguna villa con saldo pendiente</td>

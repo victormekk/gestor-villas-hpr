@@ -34,7 +34,7 @@
             <tbody>
                 @forelse ($pagina as $f)
                     <tr>
-                        <td>{{ $f['villa'] }}</td>
+                        <td style="white-space: nowrap">{{ $f['villa'] }}</td>
                         <td>{{ $f['propietario'] }}</td>
                         @foreach ($buckets as $clave => $etiqueta)
                             <td class="der">{{ $f['bucket'] === $clave ? Formato::monto($f['saldo']) : '' }}</td>
