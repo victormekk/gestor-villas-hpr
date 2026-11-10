@@ -7,11 +7,18 @@ FROM php:8.4-cli
 # Dependencias del sistema para las extensiones de PHP que usa el proyecto:
 #   - gd: imagenes en los PDF/Excel (logo)      - zip: leer/escribir .xlsx (PhpSpreadsheet)
 #   - libpq: driver de PostgreSQL (pdo_pgsql)   - freetype/libpng/libzip: requeridas por gd/zip
+#   - chromium + fonts-liberation: arman los PDF de los reportes (App\Support\PdfChrome); Liberation
+#     Sans reemplaza a Helvetica con las mismas medidas   - sockets: la usa chrome-php para hablar con Chromium
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libpq-dev unzip git \
+        chromium fonts-liberation \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" gd zip pdo_pgsql opcache \
+    && docker-php-ext-install -j"$(nproc)" gd zip pdo_pgsql opcache sockets \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# los PDF de reportes con Chromium; si no arrancara, se generan con dompdf (config/pdf.php)
+ENV PDF_MOTOR=chrome \
+    CHROME_PATH=/usr/bin/chromium
 
 # Limites de PHP: la imagen trae 128 MB de memoria por defecto y los PDF grandes (estado de cuenta de
 # todas las villas en varios años) necesitan mas; tambien se da mas tiempo a las exportaciones largas.

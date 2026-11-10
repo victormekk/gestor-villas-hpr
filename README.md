@@ -39,6 +39,11 @@ php artisan serve
 ```
 Queda en `http://127.0.0.1:8000`. En local usa SQLite.
 
+Los PDF de los reportes se arman con Chrome sin ventana (`chrome-php/chrome`); en local usa el Chrome o
+Edge instalado y, si no encuentra ninguno, dompdf. En Windows, `composer install` pide la extension
+`sockets`, pero activarla en este PHP rompe Laravel; como del lado cliente no hace falta, se instala con
+`composer install --ignore-platform-req=ext-sockets`. En el Docker (Linux) si se instala.
+
 **Frontend**
 ```
 cd frontend

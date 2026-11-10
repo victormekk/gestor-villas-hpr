@@ -12,7 +12,7 @@
     <meta charset="utf-8">
     <title>{{ $titulo }}</title>
     <style>
-        /* margenes: 2.54 cm arriba y abajo, 3 cm a los lados (el pie de pagina se alinea con ellos, ver ExportaArchivos::pdf) */
+        /* margenes: 2.54 cm arriba y abajo, 3 cm a los lados (el pie de pagina se alinea con ellos, ver App\Support\PdfChrome y ExportaArchivos::pdfDompdf) */
         @page { margin: 2.54cm 3cm 2.54cm 3cm; }
         /* Impresion en negro y grises, sin fondos de color (ahorro de tinta). Solo el logo queda en color. */
         body { font-family: 'Helvetica', sans-serif; font-size: 10px; color: #000000; }

@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api\Concerns;
 
 use App\Support\NombreArchivo;
+use App\Support\PdfChrome;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -53,6 +57,24 @@ trait ExportaArchivos
         // el usuario que genera el reporte aparece en la cabecera, bajo la fecha de generacion
         $datos['usuario'] = $this->usuarioActual();
 
+        // Chrome (rapido con reportes grandes); si no esta o falla, dompdf para no dejar al usuario sin su PDF
+        if (PdfChrome::disponible()) {
+            try {
+                return response(PdfChrome::generar(view($vista, $datos)->render(), $orientacion), 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $archivo, Str::ascii($archivo)),
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo generar el PDF con Chrome; se usa dompdf.', ['vista' => $vista, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $this->pdfDompdf($vista, $datos, $archivo, $orientacion);
+    }
+
+    /** El motor anterior: mas lento con reportes grandes. El pie de pagina se dibuja sobre cada hoja ya armada. */
+    private function pdfDompdf(string $vista, array $datos, string $archivo, string $orientacion): Response
+    {
         $pdf = Pdf::loadView($vista, $datos)->setPaper('letter', $orientacion);
         $pdf->render();
 

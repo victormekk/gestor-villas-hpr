@@ -50,6 +50,8 @@ function exportarEstadoCuenta(formato: FormatoExportacion) {
 }
 
 async function generarEstadoCuenta() {
+  // mientras uno se esta generando no se lanza otro (Enter en el buscador de villa tambien envia el formulario)
+  if (cargandoEstado.value) return
   cargandoEstado.value = true
   try {
     const { data } = await api.get('/api/reportes/estado-cuenta', {
@@ -502,8 +504,17 @@ watch(() => dataStore.version, () => {
             <label class="mb-1 block text-sm font-medium text-espresso-700">Hasta</label>
             <FechaInput v-model="hasta" :min="desde" class="w-40 rounded-lg border border-espresso-800/15 bg-cream-50 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
           </div>
-          <button type="submit" class="rounded-lg bg-gradient-to-r from-wine-500 via-brand-500 to-gold-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
-            Generar
+          <button
+            type="submit"
+            :disabled="cargandoEstado"
+            :aria-busy="cargandoEstado"
+            class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-wine-500 via-brand-500 to-gold-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70"
+          >
+            <svg v-if="cargandoEstado" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" class="opacity-30" />
+              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+            </svg>
+            {{ cargandoEstado ? 'Generando...' : 'Generar' }}
           </button>
           <ExportarBotones @exportar="exportarEstadoCuenta" />
         </div>
