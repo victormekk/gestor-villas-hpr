@@ -1,5 +1,5 @@
 # Imagen para desplegar el backend en un host tipo Railway/Render (build por Dockerfile).
-# Pensada para la fase de PRUEBAS en linea: un solo proceso (php artisan serve). Para produccion
+# Pensada para la fase de PRUEBAS en linea: php artisan serve con varios procesos (PHP_CLI_SERVER_WORKERS). Para produccion
 # real con mas trafico, cambiar a PHP-FPM + Nginx u Octane -- ver la seccion "Despliegue" del README.
 
 FROM php:8.4-cli
@@ -19,6 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # los PDF de reportes con Chromium; si no arrancara, se generan con dompdf (config/pdf.php)
 ENV PDF_MOTOR=chrome \
     CHROME_PATH=/usr/bin/chromium
+
+# `php artisan serve` atiende varias peticiones a la vez con este numero de procesos (sin esto es uno
+# solo, y un reporte pesado deja a todos los demas esperando). Laravel solo lo respeta con --no-reload
+# (ver CMD). Se puede cambiar desde las variables de Railway sin reconstruir la imagen.
+ENV PHP_CLI_SERVER_WORKERS=4
 
 # Limites de PHP: la imagen trae 128 MB de memoria por defecto y los PDF grandes (estado de cuenta de
 # todas las villas en varios años) necesitan mas; tambien se da mas tiempo a las exportaciones largas.
@@ -41,8 +46,8 @@ RUN composer dump-autoload --optimize --no-dev \
 EXPOSE 8000
 
 # Al arrancar: cachea config/rutas, aplica migraciones pendientes (no destruye datos) y sirve.
-# `php artisan serve` es de un solo proceso -- suficiente para pruebas, no para carga real.
+# `php artisan serve` con PHP_CLI_SERVER_WORKERS procesos; --no-reload es obligatorio para que Laravel los respete.
 CMD php artisan config:cache \
     && php artisan route:cache \
     && php artisan migrate --force \
-    && php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"
+    && php artisan serve --no-reload --host=0.0.0.0 --port="${PORT:-8000}"
